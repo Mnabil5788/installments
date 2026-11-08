@@ -157,7 +157,7 @@ function listView(){
  <td>${k.rem>0&&k.first?fd(k.first):'—'}</td><td><span class="chip ${k.st}">${k.st}</span></td><td><div class="sq">${sqs(c)}</div></td></tr>`).join('')}</table></div>`
  :rows.map(({c,k})=>`<div class="cust"><div class="hd"><button class="nm" data-open="${c.id}">${esc(c.name)} ◂</button><span class="chip ${k.st}">${k.st}</span></div>
  <div class="sq">${sqs(c)}</div><div class="ft"><span>الأصلي: <input type="number" inputmode="decimal" data-o="${c.id}" value="${c.orig??''}" style="width:100px;padding:3px 6px"></span><span>المتبقي: <b>${fm(k.rem)}</b></span><span>المدفوع: <b>${fm(k.paid)}</b></span><span>الأقساط: <b>${k.cnt}/${c.n}</b></span>${k.late?`<span>متأخر: <b>${k.late}</b></span>`:''}${k.rem>0&&k.first?`<span>القادم: <b>${fd(k.first)}</b></span>`:''}</div></div>`).join('');
-  return d+`<div class="bar"><input id="q" placeholder="بحث بالاسم أو الهاتف أو المنتج" value="${esc(q)}"><button class="p" id="add">+ عميل جديد</button><div class="mn"><button id="mnb">⋯ المزيد</button><div class="mnu"><h4>استيراد</h4><button id="imp">📥 استيراد من Excel</button><h4>تصدير</h4><button id="exp">تصدير العملاء</button><button id="exp2">تصدير الأقساط</button><h4>النسخ الاحتياطي</h4><button id="bk">💾 حفظ نسخة احتياطية</button><button id="rs">استعادة نسخة</button><h4>الأمان</h4><button id="sec">🔒 الرقم السري</button></div></div></div>
+  return d+`<div class="bar"><input id="q" placeholder="بحث بالاسم أو الهاتف أو المنتج" value="${esc(q)}"><button class="p" id="add">+ عميل جديد</button><div class="mn"><button id="mnb">⋯ المزيد</button><div class="mnu"><h4>استيراد</h4><button id="imp">📥 استيراد من Excel</button><h4>تصدير</h4><button id="expx">📊 تصدير Excel ملوّن</button><button id="exp">تصدير العملاء</button><button id="exp2">تصدير الأقساط</button><h4>النسخ الاحتياطي</h4><button id="bk">💾 حفظ نسخة احتياطية</button><button id="rs">استعادة نسخة</button><h4>الأمان</h4><button id="sec">🔒 الرقم السري</button></div></div></div>
  <div class="bar"><select id="flt">${[['all','عرض: الكل'],['late','عرض: متأخرين'],['week','عرض: قسط خلال أسبوع'],['done','عرض: مكتمل']].map(([v,t])=>`<option value="${v}"${flt===v?' selected':''}>${t}</option>`).join('')}</select>
  <select id="srt"><option value="name"${srt==='name'?' selected':''}>ترتيب: الاسم</option><option value="rem"${srt==='rem'?' selected':''}>الأكبر متبقي</option><option value="late"${srt==='late'?' selected':''}>الأقدم تأخيرًا</option></select></div>
  <div class="lg"><span><i style="background:var(--paid)"></i>مدفوع</span><span><i style="background:var(--late)"></i>متأخر</span><span><i style="background:var(--soon)"></i>لم يحن موعده</span><span>اضغط المربع لتسجيل السداد</span></div>`+body}
@@ -254,7 +254,7 @@ async function auth(){const h=localStorage.getItem('inst_pin');
 const guard=(fn,no)=>auth().then(ok=>ok?fn():no&&no());
 /* حفظ الملفات (أندرويد: مشاركة / حفظ) */
 async function saveFile(fn,data,mime){const F=plug('Filesystem'),S=plug('Share');
- if(F&&S){try{const r=await F.writeFile({path:fn,data,directory:'CACHE',encoding:'utf8'});await S.share({title:fn,url:r.uri,dialogTitle:'احفظ الملف أو ابعته'})}catch(e){if(!/cancel/i.test(String(e&&e.message)))alert('تعذر حفظ الملف: '+(e&&e.message||e))}return}
+ if(F&&S){try{const bin=data instanceof Uint8Array,r=await F.writeFile(bin?{path:fn,data:btoa(Array.from(data,x=>String.fromCharCode(x)).join('')),directory:'CACHE'}:{path:fn,data,directory:'CACHE',encoding:'utf8'});await S.share({title:fn,url:r.uri,dialogTitle:'احفظ الملف أو ابعته'})}catch(e){if(!/cancel/i.test(String(e&&e.message)))alert('تعذر حفظ الملف: '+(e&&e.message||e))}return}
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:mime}));a.download=fn;document.body.appendChild(a);a.click();a.remove()}
 async function backup(){await saveFile('backup-'+today()+'.json',JSON.stringify({v:2,at:Date.now(),customers:L,special:SP},null,1),'application/json')}
 async function restore(f){if(!f)return;try{let a=JSON.parse(await f.text()),sp=null;if(!Array.isArray(a)){sp=a.special;a=a.customers}
@@ -306,11 +306,57 @@ document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)r
  if(t.id==='sadd'){const a=+$('#sa').value;if(!(a!==0&&isFinite(a)))return;SP.push({d:today(),t:$('#sn').value.trim(),a});saveSP()}
  else if(t.dataset.ds!=null){if(confirm('حذف هذا المبلغ؟')){SP.splice(+t.dataset.ds,1);saveSP()}}
  else if(t.id==='imp')$('#xlf').click()
+ else if(t.id==='expx')exportXlsx()
  else if(t.id==='sec')(async()=>{if(localStorage.getItem('inst_pin')&&!await auth())return;if(await setPin())alert('تم حفظ الرقم السري')})()});
 document.addEventListener('change',e=>{if(e.target.id==='xlf'){importFile(e.target.files[0]);e.target.value=''}});
 
 document.addEventListener('click',e=>{const m=document.querySelector('.mn');if(!m)return;
  if(e.target.closest('#mnb'))m.classList.toggle('open');else m.classList.remove('open')},true);
+/* ===== تصدير Excel ملوّن ===== */
+const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc=u=>{let c=-1;for(let i=0;i<u.length;i++)c=crcT[(c^u[i])&255]^(c>>>8);return(c^-1)>>>0};
+function zipStore(files){const E=new TextEncoder(),parts=[],cen=[];let off=0;
+ const w=(n,f)=>{const a=new Uint8Array(n);f(new DataView(a.buffer));return a};
+ for(const[name,txt]of files){const nm=E.encode(name),d=E.encode(txt),c=crc(d);
+  parts.push(w(30,v=>{v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint16(6,0x0800,true);v.setUint16(12,23585,true);v.setUint32(14,c,true);v.setUint32(18,d.length,true);v.setUint32(22,d.length,true);v.setUint16(26,nm.length,true)}),nm,d);
+  cen.push(w(46,v=>{v.setUint32(0,0x02014b50,true);v.setUint16(4,20,true);v.setUint16(6,20,true);v.setUint16(8,0x0800,true);v.setUint16(14,23585,true);v.setUint32(16,c,true);v.setUint32(20,d.length,true);v.setUint32(24,d.length,true);v.setUint16(28,nm.length,true);v.setUint32(42,off,true)}),nm);
+  off+=30+nm.length+d.length}
+ const cs=cen.reduce((s,a)=>s+a.length,0),end=w(22,v=>{v.setUint32(0,0x06054b50,true);v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);v.setUint32(12,cs,true);v.setUint32(16,off,true)});
+ const all=[...parts,...cen,end],out=new Uint8Array(all.reduce((s,a)=>s+a.length,0));let p=0;for(const a of all){out.set(a,p);p+=a.length}return out}
+const XE=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[<>&"]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[m]));
+const cl=i=>{let s='';for(i++;i>0;i=Math.floor((i-1)/26))s=String.fromCharCode(65+(i-1)%26)+s;return s};
+function xlsxStyles(){const F=(b,c)=>`<font>${b?'<b/>':''}<sz val="11"/>${c?`<color rgb="FF${c}"/>`:''}<name val="Arial"/></font>`,
+ L=c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c}"/><bgColor indexed="64"/></patternFill></fill>`,
+ B=(st,c)=>`<border>${['left','right','top','bottom'].map(x=>`<${x} style="${st}"><color rgb="FF${c}"/></${x}>`).join('')}<diagonal/></border>`,
+ X=(n,f,l,b,a)=>`<xf numFmtId="${n}" fontId="${f}" fillId="${l}" borderId="${b}" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"${a?' horizontal="center"':''}${a===2?' wrapText="1"':''}/></xf>`;
+ const xs=[X(0,0,0,0),X(0,1,2,1,2),X(0,0,0,1),X(164,0,0,1,1),X(165,0,0,1,1),X(0,3,3,2,1),X(0,4,4,2,1),X(0,5,5,2,1),X(0,6,6,1,1),X(0,4,4,1,1),X(0,3,3,1,1),X(164,4,0,1,1),X(0,2,7,1),X(164,2,7,1,1),X(0,0,0,0),X(0,0,0,0),X(0,0,8,2,1),X(0,0,0,1,1),X(1,0,0,1,1)];
+ return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.##"/><numFmt numFmtId="165" formatCode="0.0&quot;%&quot;"/></numFmts><fonts count="7">${[F(0),F(1,'FFFFFF'),F(1),F(1,'0D4D38'),F(1,'9A2A20'),F(1,'7A5B00'),F(1,'14582F')].join('')}</fonts><fills count="9"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${['14293D','BFE5D3','F6CFC9','F3E3B5','D4ECD9','E6EAED','F4F6F7'].map(L).join('')}</fills><borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>${B('thin','D0D6DA')}${B('medium','FFFFFF')}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xs.length}">${xs.join('')}</cellXfs></styleSheet>`}
+async function exportXlsx(){
+ const t=today(),mx=Math.max(1,...L.map(c=>c.n)),sd=d=>fd(d).replace(/\/(\d\d)(\d\d)$/,'/$2'),
+ S=(t,s)=>({t,s}),N=(n,s)=>({n,s}),
+ H=['رقم','الاسم','المنتج','الهاتف','العنوان','تاريخ البيع','المبلغ','المبلغ الأصلي','قيمة القسط','عدد الأقساط','أقساط مدفوعة','أقساط متبقية','المدفوع','المتبقي','نسبة السداد','أقساط متأخرة','مبلغ متأخر','أيام التأخير','القسط القادم','قيمة القادم','الحالة','آخر ملاحظة'],nc=H.length,
+ rows=[[S('دليل الألوان',12),S('✔ مدفوع',5),S('متأخر',6),S('لم يحن موعده',7),S('داخل المربع: تاريخ السداد للمدفوع، وتاريخ الاستحقاق لغيره',12)],
+ [...H.map(h=>S(h,1)),...Array.from({length:mx},(_,i)=>S('قسط '+(i+1),1))]];
+ const tot={g:0,h:0,m:0,n:0,q:0};
+ L.forEach((c,r)=>{const k=calc(c),nt=(c.notes||[]).slice(-1)[0],o=c.orig===null||c.orig===undefined||c.orig==='';
+  tot.g+=c.amount;tot.h+=o?0:+c.orig;tot.m+=k.paid;tot.n+=k.rem;tot.q+=k.lateAmt;
+  const row=[N(r+1,18),S(c.name,2),S(c.product,2),S(c.phone,17),S(c.addr,2),S(fd(c.date),17),N(c.amount,3),o?S('',3):N(+c.orig,3),N(amt(c,1),3),N(c.n,18),N(k.cnt,18),N(c.n-k.cnt,18),N(k.paid,3),N(k.rem,3),N(rd(k.paid/c.amount*100),4),N(k.late,18),N(k.lateAmt,k.lateAmt?11:3),N(k.lateDays,18),S(k.rem>0&&k.first?fd(k.first):'',17),k.rem>0?N(k.firstAmt,3):S('',3),S(k.st,k.st==='مكتمل'?10:k.st==='متأخر'?9:8),S(nt?fd(nt.d)+' - '+nt.t:'',2)];
+  for(let i=1;i<=mx;i++){if(i>c.n){row.push(S('',16));continue}const due=addM(c.date,i),p=c.paid&&c.paid[i];
+   row.push(p?S('✔ '+sd(p),5):S(sd(due),due<t?6:7))}
+  rows.push(row)});
+ const last=rows.length,tr=Array.from({length:nc+mx},()=>S('',12));tr[1]=S('الإجمالي',12);
+ [['g',6],['h',7],['m',12],['n',13],['q',16]].forEach(([k,i])=>tr[i]={f:`SUM(${cl(i)}3:${cl(i)}${last})`,n:rd(tot[k]),s:13});rows.push(tr);
+ const W=[7,22,16,15,26,12,12,12,12,9,10,10,12,12,10,10,12,10,12,12,10,30,...Array(mx).fill(13)];
+ const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView rightToLeft="1" showGridLines="0" workbookViewId="0"><pane xSplit="2" ySplit="2" topLeftCell="C3" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="22"/><cols>${W.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rows.map((r,ri)=>`<row r="${ri+1}" ht="${ri===1?32:22}" customHeight="1">${r.map((c,ci)=>{const ref=cl(ci)+(ri+1);
+  return c.f!=null?`<c r="${ref}" s="${c.s}"><f>${c.f}</f><v>${c.n}</v></c>`:c.n!==undefined?`<c r="${ref}" s="${c.s}"><v>${c.n}</v></c>`:c.t?`<c r="${ref}" s="${c.s}" t="inlineStr"><is><t xml:space="preserve">${XE(c.t)}</t></is></c>`:`<c r="${ref}" s="${c.s}"/>`}).join('')}</row>`).join('')}</sheetData></worksheet>`,
+ NS='xmlns="http://schemas.openxmlformats.org/',RL=NS+'package/2006/relationships"',HD='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+ const bytes=zipStore([['[Content_Types].xml',`${HD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`],
+ ['_rels/.rels',`${HD}<Relationships ${RL}><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+ ['xl/workbook.xml',`${HD}<workbook ${NS}spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="العملاء والأقساط" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+ ['xl/_rels/workbook.xml.rels',`${HD}<Relationships ${RL}><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+ ['xl/styles.xml',xlsxStyles()],['xl/worksheets/sheet1.xml',sheet]]);
+ await saveFile('عملاء-وأقساط-'+t+'.xlsx',bytes,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}
+
 render();
 (async()=>{let t=setTimeout(()=>{if(!store)try{L=JSON.parse(localStorage.getItem('inst')||'[]');render()}catch(e){}},4000);
  try{const db=await claude.use('db');
